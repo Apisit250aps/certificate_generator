@@ -78,3 +78,13 @@
 
 - แอปพลิเคชันนี้รองรับการสร้างเกียรติบัตรจากไฟล์ PDF ที่มีหลายหน้า โดยแต่ละหน้าจะถูกแยกออกเป็นไฟล์เดี่ยวตามรายชื่อในไฟล์ Excel
 - หากต้องการสร้างเกียรติบัตรพร้อมใส่ชื่อลงในเอกสาร แนะนำให้ใช้ฟังก์ชัน Mail Merge ใน Microsoft Word เพื่อสร้างไฟล์ PDF ก่อน แล้วจึงใช้แอปพลิเคชันนี้เพื่อแยกไฟล์
+
+## Build Command
+
+```bash
+pyinstaller --onefile --name "Certificate Generator" --windowed --icon=resources/icons/app_icon.ico main.py
+```
+## License
+
+MIT License
+Copyright (c) 2025 [Apisit Saithong]
