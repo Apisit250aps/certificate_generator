@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (QWidget, QGridLayout, QLabel, QLineEdit,
                             QFrame, QSizePolicy)
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QIcon
-
+from PyQt6.QtCore import QStandardPaths
 class FileSelector(QWidget):
     excel_file_selected = pyqtSignal(str)
     
@@ -94,24 +94,30 @@ class FileSelector(QWidget):
         layout.addWidget(self.group_box)
     
     def browse_pdf(self):
+    # รับพาธของโฟลเดอร์ Documents
+        documents_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
+        
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "เลือกไฟล์เกียรติบัตร", "", "PDF Files (*.pdf)"
+            self, "เลือกไฟล์เกียรติบัตร", documents_path, "PDF Files (*.pdf)"
         )
         if file_path:
             self.pdf_path.setText(file_path)
             # อัปเดตสถานะว่าได้เลือกไฟล์แล้ว
             self.pdf_path.setStyleSheet("background-color: #e8f5e9; color: #1b5e20;")
-    
+
     def browse_excel(self):
+        # รับพาธของโฟลเดอร์ Documents
+        documents_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
+        
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "เลือกไฟล์รายชื่อ", "", "Excel Files (*.xlsx *.xls)"
+            self, "เลือกไฟล์รายชื่อ", documents_path, "Excel Files (*.xlsx *.xls)"
         )
         if file_path:
             self.excel_path.setText(file_path)
             # อัปเดตสถานะว่าได้เลือกไฟล์แล้ว
             self.excel_path.setStyleSheet("background-color: #e8f5e9; color: #1b5e20;")
             self.excel_file_selected.emit(file_path)
-    
+        
     def get_pdf_path(self):
         return self.pdf_path.text()
     
