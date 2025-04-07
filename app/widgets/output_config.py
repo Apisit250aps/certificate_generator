@@ -1,9 +1,46 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QLineEdit, QPushButton, QComboBox, QGroupBox, 
                              QFileDialog, QGridLayout, QCheckBox, QFrame,
-                             QSizePolicy)
+                             QSizePolicy, QListWidget, QAbstractItemView, 
+                             QToolButton, QDialog, QDialogButtonBox, QSpinBox,
+                             QListWidgetItem, QMessageBox)
 from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QIcon, QColor, QBrush
+
+class CustomTextDialog(QDialog):
+    """ไดอะล็อกสำหรับกำหนดข้อความเอง"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("กำหนดข้อความเอง")
+        self.resize(400, 150)
+        
+        layout = QVBoxLayout(self)
+        
+        # ส่วนกำหนดข้อความ
+        form_layout = QGridLayout()
+        self.text_label = QLabel("ข้อความ:")
+        self.text_input = QLineEdit()
+        self.text_input.setPlaceholderText("ใส่ข้อความที่ต้องการ...")
+        form_layout.addWidget(self.text_label, 0, 0)
+        form_layout.addWidget(self.text_input, 0, 1)
+        
+        layout.addLayout(form_layout)
+        
+        # ปุ่มยกเลิก/ตกลง
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+    
+    def get_custom_text(self):
+        """คืนค่าข้อความที่ผู้ใช้กำหนด"""
+        return self.text_input.text()
+    
+    def set_custom_text(self, text):
+        """ตั้งค่าข้อความเริ่มต้น"""
+        self.text_input.setText(text)
 
 class OutputConfig(QWidget):
     def __init__(self):
@@ -58,50 +95,106 @@ class OutputConfig(QWidget):
         filename_frame.setStyleSheet("background-color: #f3e5f5; border-radius: 5px;")
         filename_layout = QVBoxLayout(filename_frame)
         
-        # สร้างวิดเจ็ตสำหรับเลือกคอลัมน์ที่ใช้ตั้งชื่อไฟล์
-        self.filename_label = QLabel("ตัวเลือกตั้งชื่อไฟล์:")
+        # สร้างวิดเจ็ตสำหรับส่วนของการตั้งค่าชื่อไฟล์
+        self.filename_label = QLabel("ตั้งค่ารูปแบบชื่อไฟล์:")
         self.filename_label.setStyleSheet("background-color: transparent; font-weight: bold;")
         
-        # สร้าง Container สำหรับตัวเลือกชื่อไฟล์
-        self.columns_layout = QGridLayout()
-        self.columns_layout.setVerticalSpacing(10)
+        # สร้างคำอธิบายเพิ่มเติม
+        self.help_label = QLabel("เพิ่มส่วนประกอบของชื่อไฟล์ด้านล่าง (สามารถลากเพื่อจัดลำดับใหม่):")
+        self.help_label.setStyleSheet("background-color: transparent; font-style: italic;")
         
-        # เพิ่มตัวเลือกใช้ลำดับเป็นชื่อไฟล์
-        self.use_index_checkbox = QCheckBox("ใช้ลำดับ")
-        self.use_index_checkbox.setStyleSheet("background-color: transparent;")
-        self.use_index_checkbox.setChecked(True)
-        
-        # สร้าง Combo Box สำหรับเลือกคอลัมน์
-        col1_label = QLabel("คอลัมน์ที่ 1:")
-        col1_label.setStyleSheet("background-color: transparent;")
-        self.column1_combo = QComboBox()
-        self.column1_combo.setStyleSheet("""
-            QComboBox {
-                padding: 5px;
+        # สร้าง ListWidget สำหรับแสดงส่วนประกอบของชื่อไฟล์
+        self.filename_parts_list = QListWidget()
+        self.filename_parts_list.setStyleSheet("""
+            QListWidget {
+                background-color: white;
                 border: 1px solid #bdbdbd;
                 border-radius: 3px;
-                background-color: white;
-            }
-        """)
-        
-        col2_label = QLabel("คอลัมน์ที่ 2:")
-        col2_label.setStyleSheet("background-color: transparent;")
-        self.column2_combo = QComboBox()
-        self.column2_combo.setStyleSheet("""
-            QComboBox {
                 padding: 5px;
-                border: 1px solid #bdbdbd;
-                border-radius: 3px;
-                background-color: white;
+            }
+            QListWidget::item:selected {
+                background-color: #e0f7fa;
+                color: #000000;
+                border: 1px solid #80deea;
+                border-radius: 2px;
+            }
+            QListWidget::item {
+                padding: 5px;
+                margin: 2px;
             }
         """)
+        self.filename_parts_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.filename_parts_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.filename_parts_list.setMinimumHeight(120)
+        self.filename_parts_list.model().rowsMoved.connect(self.update_parts_order)
         
-        # จัดเรียงในรูปแบบกริด
-        self.columns_layout.addWidget(self.use_index_checkbox, 0, 0, 1, 2)
-        self.columns_layout.addWidget(col1_label, 1, 0)
-        self.columns_layout.addWidget(self.column1_combo, 1, 1)
-        self.columns_layout.addWidget(col2_label, 2, 0)
-        self.columns_layout.addWidget(self.column2_combo, 2, 1)
+        # ส่วนควบคุมการเพิ่ม/ลบส่วนประกอบของชื่อไฟล์
+        controls_layout = QHBoxLayout()
+        
+        # ปุ่มเพิ่มลำดับ
+        self.add_index_btn = QPushButton("เพิ่มลำดับ")
+        self.add_index_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196f3;
+                color: white;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #1976d2;
+            }
+        """)
+        self.add_index_btn.clicked.connect(self.add_index_part)
+        
+        # ปุ่มเพิ่มคอลัมน์
+        self.add_column_btn = QPushButton("เพิ่มคอลัมน์")
+        self.add_column_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4caf50;
+                color: white;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #388e3c;
+            }
+        """)
+        self.add_column_btn.clicked.connect(self.show_column_dialog)
+        
+        # ปุ่มเพิ่มข้อความกำหนดเอง
+        self.add_custom_btn = QPushButton("เพิ่มข้อความ")
+        self.add_custom_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ff9800;
+                color: white;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #f57c00;
+            }
+        """)
+        self.add_custom_btn.clicked.connect(self.add_custom_text)
+        
+        # ปุ่มลบรายการที่เลือก
+        self.remove_btn = QPushButton("ลบรายการ")
+        self.remove_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+        """)
+        self.remove_btn.clicked.connect(self.remove_selected_part)
+        
+        controls_layout.addWidget(self.add_index_btn)
+        controls_layout.addWidget(self.add_column_btn)
+        controls_layout.addWidget(self.add_custom_btn)
+        controls_layout.addWidget(self.remove_btn)
         
         # สร้างวิดเจ็ตสำหรับแสดงตัวอย่างรูปแบบชื่อไฟล์
         preview_frame = QFrame()
@@ -120,7 +213,9 @@ class OutputConfig(QWidget):
         
         # เพิ่ม layout ลงใน filename_frame
         filename_layout.addWidget(self.filename_label)
-        filename_layout.addLayout(self.columns_layout)
+        filename_layout.addWidget(self.help_label)
+        filename_layout.addWidget(self.filename_parts_list)
+        filename_layout.addLayout(controls_layout)
         filename_layout.addWidget(preview_frame)
         
         # เพิ่มวิดเจ็ตลงใน GroupBox
@@ -131,14 +226,11 @@ class OutputConfig(QWidget):
         # เพิ่ม GroupBox ลงใน Layout หลัก
         layout.addWidget(self.group_box)
         
-        # เชื่อมต่อสัญญาณ
-        self.column1_combo.currentTextChanged.connect(self.update_example)
-        self.column2_combo.currentTextChanged.connect(self.update_example)
-        self.use_index_checkbox.toggled.connect(self.update_example)
+        # เก็บข้อมูลคอลัมน์
+        self.headers = []
         
-        # ค่าเริ่มต้น
-        self.column1_combo.addItem("-- เลือกคอลัมน์ --")
-        self.column2_combo.addItem("-- เลือกคอลัมน์ --")
+        # เตรียมข้อมูลสำหรับเก็บส่วนประกอบของชื่อไฟล์
+        self.filename_parts = []  # เก็บข้อมูลในรูปแบบ (type, value)
     
     def browse_output_dir(self):
         dir_path = QFileDialog.getExistingDirectory(
@@ -150,80 +242,178 @@ class OutputConfig(QWidget):
             self.output_path.setStyleSheet("background-color: #e8f5e9; color: #1b5e20;")
     
     def set_columns(self, headers):
-        self.column1_combo.clear()
-        self.column2_combo.clear()
+        """อัปเดตรายการคอลัมน์จาก Excel"""
+        self.headers = headers
+        self.update_example()
         
-        self.column1_combo.addItem("-- เลือกคอลัมน์ --")
-        self.column2_combo.addItem("-- เลือกคอลัมน์ --")
-        
-        for header in headers:
-            self.column1_combo.addItem(header)
-            self.column2_combo.addItem(header)
-        
-        # เลือกคอลัมน์แรกโดยอัตโนมัติ
-        if len(headers) >= 1:
-            self.column1_combo.setCurrentIndex(1)
-        
-        # เลือกคอลัมน์ที่สองโดยอัตโนมัติ (ถ้ามี)
-        if len(headers) >= 2:
-            self.column2_combo.setCurrentIndex(2)
-        
+        # เพิ่มคอลัมน์แรกและคอลัมน์ที่สองโดยอัตโนมัติถ้ามี และถ้ายังไม่มีรายการใดในลิสต์
+        if len(self.filename_parts) == 0:
+            # เพิ่มลำดับ
+            self.add_index_part()
+            
+            # เพิ่มคอลัมน์แรก
+            if len(headers) >= 1:
+                # สร้าง item สำหรับคอลัมน์แรกโดยตรง โดยไม่ผ่านไดอะล็อก
+                self.add_column_direct(0)
+            
+            # เพิ่มคอลัมน์ที่สอง
+            if len(headers) >= 2:
+                # สร้าง item สำหรับคอลัมน์ที่สองโดยตรง โดยไม่ผ่านไดอะล็อก
+                self.add_column_direct(1)
+    
+    def add_index_part(self):
+        """เพิ่มลำดับเป็นส่วนหนึ่งของชื่อไฟล์"""
+        self.filename_parts.append(("index", None))
+        item = QListWidgetItem("ลำดับ")
+        item.setBackground(QBrush(QColor("#e3f2fd")))
+        self.filename_parts_list.addItem(item)
         self.update_example()
     
+    def show_column_dialog(self):
+        """แสดงไดอะล็อกเลือกคอลัมน์"""
+        if not self.headers:
+            QMessageBox.warning(self, "ไม่พบข้อมูลคอลัมน์", "กรุณาโหลดไฟล์ Excel และเลือกชีทก่อน")
+            return
+        
+        # สร้างและแสดงไดอะล็อก
+        dialog = QDialog(self)
+        dialog.setWindowTitle("เลือกคอลัมน์")
+        dialog.resize(400, 200)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # เพิ่มคำอธิบาย
+        info_label = QLabel("เลือกคอลัมน์จาก Excel ที่ต้องการใช้ในชื่อไฟล์:")
+        layout.addWidget(info_label)
+        
+        # เพิ่ม ComboBox สำหรับเลือกคอลัมน์
+        column_combo = QComboBox()
+        for header in self.headers:
+            column_combo.addItem(header)
+        
+        layout.addWidget(column_combo)
+        
+        # ปุ่มยกเลิก/ตกลง
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+        
+        # แสดงไดอะล็อก
+        result = dialog.exec()
+        
+        # ตรวจสอบและดำเนินการตามผลลัพธ์
+        if result == QDialog.DialogCode.Accepted:
+            column_index = column_combo.currentIndex()
+            column_name = column_combo.currentText()
+            self.add_column_direct(column_index)
+    
+    def add_column_direct(self, column_index):
+        """เพิ่มคอลัมน์โดยตรงโดยใช้ column_index"""
+        if 0 <= column_index < len(self.headers):
+            column_name = self.headers[column_index]
+            self.filename_parts.append(("column", column_index))
+            item = QListWidgetItem(f"คอลัมน์: {column_name}")
+            item.setBackground(QBrush(QColor("#e8f5e9")))
+            self.filename_parts_list.addItem(item)
+            self.update_example()
+    
+    def add_custom_text(self):
+        """เพิ่มข้อความกำหนดเองเป็นส่วนหนึ่งของชื่อไฟล์"""
+        dialog = CustomTextDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            text = dialog.get_custom_text()
+            if text:
+                self.filename_parts.append(("custom", text))
+                item = QListWidgetItem(f"ข้อความ: {text}")
+                item.setBackground(QBrush(QColor("#fff3e0")))
+                self.filename_parts_list.addItem(item)
+                self.update_example()
+    
+    def remove_selected_part(self):
+        """ลบส่วนประกอบของชื่อไฟล์ที่เลือก"""
+        current_row = self.filename_parts_list.currentRow()
+        if current_row >= 0:
+            self.filename_parts_list.takeItem(current_row)
+            self.filename_parts.pop(current_row)
+            self.update_example()
+    
+    def update_parts_order(self):
+        """อัปเดตลำดับของส่วนประกอบชื่อไฟล์เมื่อมีการลากและวาง"""
+        self.sync_parts_with_listwidget()
+        self.update_example()
+    
+    def sync_parts_with_listwidget(self):
+        """ซิงค์ข้อมูล filename_parts กับรายการใน ListWidget"""
+        new_parts = []
+        for i in range(self.filename_parts_list.count()):
+            item_text = self.filename_parts_list.item(i).text()
+            
+            if item_text == "ลำดับ":
+                new_parts.append(("index", None))
+            elif item_text.startswith("คอลัมน์:"):
+                header = item_text[len("คอลัมน์: "):]
+                try:
+                    column_index = self.headers.index(header)
+                    new_parts.append(("column", column_index))
+                except ValueError:
+                    # กรณีที่ไม่พบคอลัมน์ในรายการคอลัมน์ปัจจุบัน
+                    continue
+            elif item_text.startswith("ข้อความ:"):
+                text = item_text[len("ข้อความ: "):]
+                new_parts.append(("custom", text))
+        
+        self.filename_parts = new_parts
+    
     def update_example(self):
-        use_index = self.use_index_checkbox.isChecked()
-        col1 = self.column1_combo.currentText()
-        col2 = self.column2_combo.currentText()
+        """อัปเดตตัวอย่างชื่อไฟล์"""
+        example = []
+        for part_type, value in self.filename_parts:
+            if part_type == "index":
+                example.append("1")
+            elif part_type == "column":
+                if self.headers and 0 <= value < len(self.headers):
+                    # แสดงตัวอย่างด้วยค่าจำลอง
+                    header = self.headers[value].lower()
+                    if "name" in header or "ชื่อ" in header:
+                        example.append("นายทดสอบ")
+                    elif "surname" in header or "นามสกุล" in header or "สกุล" in header:
+                        example.append("ใจดี")
+                    elif "id" in header or "รหัส" in header:
+                        example.append("12345")
+                    else:
+                        example.append(f"ข้อมูล{self.headers[value]}")
+            elif part_type == "custom":
+                example.append(value)
         
-        example = ""
-        if use_index:
-            example += "1"
-        
-        if col1 and col1 != "-- เลือกคอลัมน์ --":
-            if example:
-                example += "_"
-            example += "นายทดสอบ"
-        
-        if col2 and col2 != "-- เลือกคอลัมน์ --":
-            if example:
-                example += "_"
-            example += "ใจดี"
-        
-        if not example:
-            example = "ไม่มีข้อมูลที่เลือก"
-        
-        self.format_example.setText(f"ตัวอย่าง: {example}.pdf")
+        if example:
+            self.format_example.setText(f"ตัวอย่าง: {'_'.join(example)}.pdf")
+        else:
+            self.format_example.setText("ตัวอย่าง: ไม่มีรูปแบบที่กำหนด.pdf")
     
     def get_output_path(self):
         return self.output_path.text()
     
     def get_name_format(self):
+        """คืนค่ารูปแบบของชื่อไฟล์"""
+        # สร้างรูปแบบสำหรับการ format
         parts = []
-        if self.use_index_checkbox.isChecked():
-            parts.append("{}")
-        
-        col1 = self.column1_combo.currentText()
-        if col1 and col1 != "-- เลือกคอลัมน์ --":
-            parts.append("{}")
-        
-        col2 = self.column2_combo.currentText()
-        if col2 and col2 != "-- เลือกคอลัมน์ --":
+        for _ in self.filename_parts:
             parts.append("{}")
         
         return "_".join(parts)
     
     def get_selected_column_indices(self):
-        indices = []
+        """คืนค่าลิสต์ของค่าที่ใช้ในการตั้งชื่อไฟล์"""
+        values = []
+        for part_type, value in self.filename_parts:
+            if part_type == "index":
+                values.append(-1)  # -1 หมายถึงใช้ index
+            elif part_type == "column":
+                values.append(value)
+            elif part_type == "custom":
+                values.append(value)  # ส่งค่าข้อความกำหนดเอง
         
-        if self.use_index_checkbox.isChecked():
-            indices.append(-1)  # -1 หมายถึงใช้ index
-        
-        col1_idx = self.column1_combo.currentIndex() - 1  # -1 เพื่อข้ามตัวเลือก "-- เลือกคอลัมน์ --"
-        if col1_idx >= 0:
-            indices.append(col1_idx)
-        
-        col2_idx = self.column2_combo.currentIndex() - 1
-        if col2_idx >= 0:
-            indices.append(col2_idx)
-        
-        return indices
+        return values

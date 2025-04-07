@@ -9,49 +9,7 @@ from app.widgets.excel_viewer import ExcelViewer
 from app.widgets.output_config import OutputConfig
 from core.pdf_manager import PDFManager
 from core.excel_manager import ExcelManager
-
-class CertificateGeneratorWorker(QThread):
-    progress = pyqtSignal(int)
-    finished = pyqtSignal(str)
-    error = pyqtSignal(str)
-    
-    def __init__(self, pdf_path, excel_path, sheet_name, output_dir, name_format, column_indices):
-        super().__init__()
-        self.pdf_path = pdf_path
-        self.excel_path = excel_path
-        self.sheet_name = sheet_name
-        self.output_dir = output_dir
-        self.name_format = name_format
-        self.column_indices = column_indices
-        
-    def run(self):
-        try:
-            pdf_manager = PDFManager(self.pdf_path)
-            excel_manager = ExcelManager(self.excel_path)
-            data = excel_manager.get_data(self.sheet_name)
-            
-            total = len(data)
-            for i, row in enumerate(data):
-                # สร้างชื่อไฟล์จากคอลัมน์ที่เลือก
-                filename_parts = []
-                for idx in self.column_indices:
-                    if idx == -1:  # กรณีเลือก index
-                        filename_parts.append(str(i+1))
-                    else:
-                        filename_parts.append(str(row[idx]))
-                
-                filename = self.name_format.format(*filename_parts)
-                # สร้างไฟล์ PDF
-                output_path = f"{self.output_dir}/{filename}.pdf"
-                pdf_manager.extract_page(i, output_path)
-                
-                # อัปเดตความคืบหน้า
-                progress_val = int((i + 1) / total * 100)
-                self.progress.emit(progress_val)
-            
-            self.finished.emit(f"เสร็จสิ้น: สร้างเกียรติบัตรทั้งหมด {total} ไฟล์")
-        except Exception as e:
-            self.error.emit(f"เกิดข้อผิดพลาด: {str(e)}")
+from core.certificate_generator import CertificateGeneratorWorker
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -202,7 +160,7 @@ class MainWindow(QMainWindow):
             }
             QLabel {
                 font-size: 13px;
-            }
+                }
             QComboBox, QLineEdit {
                 padding: 5px;
                 border: 1px solid #bdbdbd;
@@ -275,10 +233,14 @@ class MainWindow(QMainWindow):
         sheet_name = self.excel_viewer.get_selected_sheet()
         output_dir = self.output_config.get_output_path()
         name_format = self.output_config.get_name_format()
-        column_indices = self.output_config.get_selected_column_indices()
+        column_values = self.output_config.get_selected_column_indices()
         
         if not all([pdf_path, excel_path, sheet_name, output_dir]):
             QMessageBox.warning(self, "ข้อมูลไม่ครบถ้วน", "กรุณาเลือกไฟล์ PDF, Excel, ชีท และโฟลเดอร์สำหรับไฟล์ output")
+            return
+        
+        if not column_values:
+            QMessageBox.warning(self, "ข้อมูลไม่ครบถ้วน", "กรุณากำหนดรูปแบบการตั้งชื่อไฟล์อย่างน้อย 1 รายการ")
             return
         
         # ตรวจสอบจำนวนหน้า PDF และจำนวนแถวข้อมูล
@@ -305,7 +267,7 @@ class MainWindow(QMainWindow):
         
         # สร้าง Worker Thread
         self.worker = CertificateGeneratorWorker(
-            pdf_path, excel_path, sheet_name, output_dir, name_format, column_indices
+            pdf_path, excel_path, sheet_name, output_dir, name_format, column_values
         )
         
         # เชื่อมต่อสัญญาณ
